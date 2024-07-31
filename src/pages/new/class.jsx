@@ -94,7 +94,7 @@ const ClassForm = ({ inputs, availability, setAvailability, unavailableDates, se
 
         const data = new FormData();
         data.append("file", file);
-        data.append("upload_preset", "your_upload_preset"); // Replace with your actual preset name
+        data.append("upload_preset", "upload"); // Updated to use the correct preset name
 
         try {
           const uploadRes = await axios.post(

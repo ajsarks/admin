@@ -103,29 +103,29 @@ const EditClassForm = () => {
       unavailableDates: formattedUnavailableDates,
     };
 
-    let imageUrls = [];
-    if (files.length > 0) {
-      const uploadPromises = files.map(async (file) => {
-        if (typeof file === 'string') {
-          // If the file is already a URL, keep it as is
-          return file;
-        }
-        const data = new FormData();
-        data.append("file", file);
-        data.append("upload_preset", "upload");
-        const uploadRes = await axios.post(
-          "https://api.cloudinary.com/v1_1/codepulse/image/upload",
-          data
-        );
-        return uploadRes.data.url;
-      });
-
-      imageUrls = await Promise.all(uploadPromises);
-    }
-
-    payload.photos = imageUrls;
-
     try {
+      // Handle file uploads
+      if (files.length > 0) {
+        const uploadPromises = files.map(async (file) => {
+          if (typeof file === 'string') {
+            // If the file is already a URL, keep it as is
+            return file;
+          }
+          const data = new FormData();
+          data.append("file", file);
+          data.append("upload_preset", "upload");
+          const uploadRes = await axios.post(
+            "https://api.cloudinary.com/v1_1/codepulse/image/upload",
+            data
+          );
+          return uploadRes.data.url;
+        });
+
+        const imageUrls = await Promise.all(uploadPromises);
+        payload.photos = imageUrls;
+      }
+
+      // Submit the updated class data
       await axiosInstance.put(`/api/classes/${id}`, payload, {
         headers: {
           'Content-Type': 'application/json'
