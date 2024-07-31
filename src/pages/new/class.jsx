@@ -66,18 +66,37 @@ const ClassForm = ({ inputs, availability, setAvailability, unavailableDates, se
     let imageUrls = [];
     if (files.length > 0) {
       const uploadPromises = Array.from(files).map(async (file) => {
+        // Add file type validation
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`File ${file.name} is not an image`);
+        }
+        // Add file size validation (e.g., max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is too large (max 5MB)`);
+        }
+
         const data = new FormData();
         data.append("file", file);
-        data.append("upload_preset", "upload"); // Replace 'upload' with your actual preset name
-        const uploadRes = await axios.post(
-          "https://api.cloudinary.com/v1_1/codepulse/image/upload",
-          data
-        );
-        const { url } = uploadRes.data;
-        return url;
+        data.append("upload_preset", "your_upload_preset"); // Replace with your actual preset name
+
+        try {
+          const uploadRes = await axios.post(
+            "https://api.cloudinary.com/v1_1/your_cloud_name/image/upload", // Replace with your actual cloud name
+            data
+          );
+          return uploadRes.data.url;
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error);
+          throw error;
+        }
       });
 
-      imageUrls = await Promise.all(uploadPromises);
+      try {
+        imageUrls = await Promise.all(uploadPromises);
+      } catch (error) {
+        setError("Error uploading one or more images. Please try again.");
+        return; // Stop form submission if there's an upload error
+      }
     }
 
     payload.photos = imageUrls;
