@@ -6,12 +6,59 @@ import Sidebar from '../../components/sidebar/Sidebar';
 import Navbar from '../../components/navbar/Navbar';
 import "./form.scss";
 import { useNavigate } from 'react-router-dom';
+import imageCompression from 'browser-image-compression';
 
 // Create an axios instance with default configurations
 const axiosInstance = axios.create({
   baseURL: process.env.REACT_APP_API_URL,
   withCredentials: true, // This ensures all requests include credentials
 });
+
+const compressImage = async (file) => {
+  const options = {
+    maxSizeMB: 1,
+    maxWidthOrHeight: 1920,
+    useWebWorker: true
+  };
+  try {
+    return await imageCompression(file, options);
+  } catch (error) {
+    console.error("Error compressing image:", error);
+    return file;
+  }
+};
+
+const uploadFile = async (file) => {
+  console.log(`Compressing ${file.name}`);
+  const compressedFile = await compressImage(file);
+  console.log(`Compressed ${file.name} from ${file.size} to ${compressedFile.size} bytes`);
+
+  const data = new FormData();
+  data.append("file", compressedFile);
+  data.append("upload_preset", "upload");
+
+  try {
+    console.log(`Uploading ${file.name}`);
+    const uploadRes = await axios.post(
+      "https://api.cloudinary.com/v1_1/codepulse/image/upload",
+      data,
+      {
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`${file.name} upload progress: ${percentCompleted}%`);
+        },
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+    console.log(`Upload completed for ${file.name}`);
+    return uploadRes.data.url;
+  } catch (error) {
+    console.error(`Error uploading ${file.name}:`, error);
+    throw error;
+  }
+};
 
 const ClassForm = ({ inputs, availability, setAvailability, unavailableDates, setUnavailableDates }) => {
   const [files, setFiles] = useState([]);
@@ -80,43 +127,19 @@ const ClassForm = ({ inputs, availability, setAvailability, unavailableDates, se
       unavailableDates: formattedUnavailableDates,
     };
 
-    let imageUrls = [];
     if (files.length > 0) {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        // Add file type validation
-        if (!file.type.startsWith('image/')) {
-          throw new Error(`File ${file.name} is not an image`);
-        }
-        // Add file size validation (e.g., max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-          throw new Error(`File ${file.name} is too large (max 5MB)`);
-        }
-
-        const data = new FormData();
-        data.append("file", file);
-        data.append("upload_preset", "upload"); // Updated to use the correct preset name
-
-        try {
-          const uploadRes = await axios.post(
-            "https://api.cloudinary.com/v1_1/your_cloud_name/image/upload", // Replace with your actual cloud name
-            data
-          );
-          return uploadRes.data.url;
-        } catch (error) {
-          console.error(`Error uploading ${file.name}:`, error);
-          throw error;
-        }
-      });
-
       try {
-        imageUrls = await Promise.all(uploadPromises);
-      } catch (error) {
-        setError("Error uploading one or more images. Please try again.");
-        return; // Stop form submission if there's an upload error
+        console.log(`Uploading ${files.length} files in parallel`);
+        const uploadPromises = files.map(file => uploadFile(file));
+        const imageUrls = await Promise.all(uploadPromises);
+        payload.photos = imageUrls;
+        console.log('All files uploaded successfully');
+      } catch (err) {
+        console.error("Error uploading images:", err);
+        setError("Error uploading images. Please try again.");
+        return;
       }
     }
-
-    payload.photos = imageUrls;
 
     try {
       await axiosInstance.post('/api/classes', payload, {
@@ -129,6 +152,7 @@ const ClassForm = ({ inputs, availability, setAvailability, unavailableDates, se
       navigate('/classes');
     } catch (err) {
       console.error('Error submitting class form:', err);
+      setError("Error submitting form. Please try again.");
     }
   };
 
