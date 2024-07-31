@@ -7,12 +7,59 @@ import Navbar from '../../components/navbar/Navbar';
 import { classInputs } from "../../formSource";
 import "../new/form.scss";
 import { useNavigate, useParams } from 'react-router-dom';
+import imageCompression from 'browser-image-compression';
 
 // Create an axios instance with default configurations
 const axiosInstance = axios.create({
   baseURL: process.env.REACT_APP_API_URL,
   withCredentials: true, // This ensures all requests include credentials
 });
+
+const compressImage = async (file) => {
+  const options = {
+    maxSizeMB: 1,
+    maxWidthOrHeight: 1920,
+    useWebWorker: true
+  };
+  try {
+    return await imageCompression(file, options);
+  } catch (error) {
+    console.error("Error compressing image:", error);
+    return file;
+  }
+};
+
+const uploadFile = async (file) => {
+  console.log(`Compressing ${file.name}`);
+  const compressedFile = await compressImage(file);
+  console.log(`Compressed ${file.name} from ${file.size} to ${compressedFile.size} bytes`);
+
+  const data = new FormData();
+  data.append("file", compressedFile);
+  data.append("upload_preset", "upload");
+
+  try {
+    console.log(`Uploading ${file.name}`);
+    const uploadRes = await axios.post(
+      "https://api.cloudinary.com/v1_1/codepulse/image/upload",
+      data,
+      {
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`${file.name} upload progress: ${percentCompleted}%`);
+        },
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+    console.log(`Upload completed for ${file.name}`);
+    return uploadRes.data.url;
+  } catch (error) {
+    console.error(`Error uploading ${file.name}:`, error);
+    throw error;
+  }
+};
 
 const EditClassForm = () => {
   const { id } = useParams();
@@ -103,29 +150,24 @@ const EditClassForm = () => {
       unavailableDates: formattedUnavailableDates,
     };
 
-    try {
-      // Handle file uploads
-      if (files.length > 0) {
-        const uploadPromises = files.map(async (file) => {
-          if (typeof file === 'string') {
-            // If the file is already a URL, keep it as is
-            return file;
-          }
-          const data = new FormData();
-          data.append("file", file);
-          data.append("upload_preset", "upload");
-          const uploadRes = await axios.post(
-            "https://api.cloudinary.com/v1_1/codepulse/image/upload",
-            data
-          );
-          return uploadRes.data.url;
-        });
-
-        const imageUrls = await Promise.all(uploadPromises);
+    if (files.length > 0) {
+      try {
+        console.log(`Uploading ${files.length} files sequentially`);
+        const imageUrls = [];
+        for (const file of files) {
+          const url = await uploadFile(file);
+          imageUrls.push(url);
+        }
         payload.photos = imageUrls;
+        console.log('All files uploaded successfully');
+      } catch (err) {
+        console.error("Error uploading images:", err);
+        setError("Error uploading images. Please try again.");
+        return;
       }
+    }
 
-      // Submit the updated class data
+    try {
       await axiosInstance.put(`/api/classes/${id}`, payload, {
         headers: {
           'Content-Type': 'application/json'
@@ -135,6 +177,7 @@ const EditClassForm = () => {
       navigate('/classes');
     } catch (err) {
       console.error('Error submitting form:', err);
+      setError("Error submitting form. Please try again.");
     }
   };
 
