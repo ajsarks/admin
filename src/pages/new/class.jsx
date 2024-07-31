@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 import axios from 'axios';
 import DriveFolderUploadOutlinedIcon from '@mui/icons-material/DriveFolderUploadOutlined'; // Ensure the icon is imported correctly
@@ -15,6 +15,7 @@ const axiosInstance = axios.create({
 
 const ClassForm = ({ inputs, availability, setAvailability, unavailableDates, setUnavailableDates }) => {
   const [files, setFiles] = useState([]);
+  const fileInputRef = useRef(null);
   const [info, setInfo] = useState({});
   const [error, setError] = useState("");
   const [teamOptions, setTeamOptions] = useState([]);
@@ -39,12 +40,28 @@ const ClassForm = ({ inputs, availability, setAvailability, unavailableDates, se
   };
 
   const handleFileChange = (e) => {
-    if (e.target.files.length > 5) {
-      setError("You can only upload a maximum of 5 images.");
-    } else {
-      setFiles(e.target.files);
+    const newFiles = Array.from(e.target.files);
+    setFiles(prevFiles => {
+      const updatedFiles = [...prevFiles, ...newFiles];
+      if (updatedFiles.length > 5) {
+        setError("You can only upload a maximum of 5 images.");
+        return prevFiles;
+      }
       setError("");
+      return updatedFiles.slice(0, 5);
+    });
+    // Reset the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
+  };
+
+  const handleRemoveFile = (index) => {
+    setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
+  };
+
+  const handleFileButtonClick = () => {
+    fileInputRef.current.click();
   };
 
   const handleSubmitForm = async (e) => {
@@ -156,16 +173,30 @@ const ClassForm = ({ inputs, availability, setAvailability, unavailableDates, se
               ))}
               <div className="formInput">
                 <label htmlFor="file">
-                  Image: <DriveFolderUploadOutlinedIcon className="icon" />
+                  Select Images: <DriveFolderUploadOutlinedIcon className="icon" />
                 </label>
                 <input
                   type="file"
                   id="file"
+                  ref={fileInputRef}
                   multiple
+                  accept="image/*"
                   onChange={handleFileChange}
-                  style={{ display: "none" }}
                 />
                 {error && <p className="error">{error}</p>}
+                {files.length > 0 && (
+                  <div>
+                    <p>{files.length} file(s) selected:</p>
+                    <ul>
+                      {files.map((file, index) => (
+                        <li key={index}>
+                          {file.name}
+                          <button type="button" onClick={() => handleRemoveFile(index)}>Remove</button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
               <button type="submit">Submit</button>
             </form>

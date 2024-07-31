@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 import axios from 'axios';
 import DriveFolderUploadOutlinedIcon from '@mui/icons-material/DriveFolderUploadOutlined';
@@ -23,6 +23,7 @@ const EditClassForm = () => {
   const [unavailableDates, setUnavailableDates] = useState([]);
   const [teamOptions, setTeamOptions] = useState([]);
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,12 +54,24 @@ const EditClassForm = () => {
   }, []);
 
   const handleFileChange = (e) => {
-    if (e.target.files.length > 5) {
-      setError("You can only upload a maximum of 5 images.");
-    } else {
-      setFiles(e.target.files);
+    const newFiles = Array.from(e.target.files);
+    setFiles(prevFiles => {
+      const updatedFiles = [...prevFiles, ...newFiles];
+      if (updatedFiles.length > 5) {
+        setError("You can only upload a maximum of 5 images.");
+        return prevFiles;
+      }
       setError("");
+      return updatedFiles.slice(0, 5);
+    });
+    // Reset the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
+  };
+
+  const handleRemoveFile = (index) => {
+    setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   };
 
   const handleChange = (e) => {
@@ -92,7 +105,11 @@ const EditClassForm = () => {
 
     let imageUrls = [];
     if (files.length > 0) {
-      const uploadPromises = Array.from(files).map(async (file) => {
+      const uploadPromises = files.map(async (file) => {
+        if (typeof file === 'string') {
+          // If the file is already a URL, keep it as is
+          return file;
+        }
         const data = new FormData();
         data.append("file", file);
         data.append("upload_preset", "upload");
@@ -100,8 +117,7 @@ const EditClassForm = () => {
           "https://api.cloudinary.com/v1_1/codepulse/image/upload",
           data
         );
-        const { url } = uploadRes.data;
-        return url;
+        return uploadRes.data.url;
       });
 
       imageUrls = await Promise.all(uploadPromises);
@@ -168,11 +184,25 @@ const EditClassForm = () => {
                 <input
                   type="file"
                   id="file"
+                  ref={fileInputRef}
                   multiple
+                  accept="image/*"
                   onChange={handleFileChange}
-                  style={{ display: "none" }}
                 />
                 {error && <p className="error">{error}</p>}
+                {files.length > 0 && (
+                  <div>
+                    <p>{files.length} file(s) selected:</p>
+                    <ul>
+                      {files.map((file, index) => (
+                        <li key={index}>
+                          {typeof file === 'string' ? file : file.name}
+                          <button type="button" onClick={() => handleRemoveFile(index)}>Remove</button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
               <button type="submit">Submit</button>
             </form>
