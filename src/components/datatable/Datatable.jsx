@@ -311,9 +311,21 @@ const Datatable = ({ columns }) => {
 
   const currentDate = new Date();
 
-  const pendingBookings = list.filter(booking => booking.status === 'pending' && booking.date && booking.date[1] && new Date(booking.date[1]) >= currentDate);
-  const confirmedBookings = list.filter(booking => booking.status === 'confirmed' && booking.date && booking.date[1] && new Date(booking.date[1]) >= currentDate);
-  const pastBookings = list.filter(booking => booking.date && booking.date[1] && new Date(booking.date[1]) < currentDate);
+  const pendingBookings = list.filter(booking => {
+    const lastDate = booking.date[booking.date.length - 1];
+    return booking.status === 'pending' && new Date(lastDate) >= currentDate;
+  });
+
+  const confirmedBookings = list.filter(booking => {
+    const lastDate = booking.date[booking.date.length - 1];
+    return booking.status === 'confirmed' && new Date(lastDate) >= currentDate;
+  });
+
+  const pastBookings = list.filter(booking => {
+    const lastDate = booking.date[booking.date.length - 1];
+    return new Date(lastDate) < currentDate;
+  });
+
   const cancelledBookings = list.filter(booking => booking.status === 'cancelled');
 
   return (

@@ -152,12 +152,15 @@ const EditClassForm = () => {
 
     if (files.length > 0) {
       try {
-        console.log(`Uploading ${files.length} files sequentially`);
-        const imageUrls = [];
-        for (const file of files) {
-          const url = await uploadFile(file);
-          imageUrls.push(url);
-        }
+        console.log(`Uploading ${files.length} files in parallel`);
+        const uploadPromises = files.map(file => {
+          if (typeof file === 'string') {
+            // If the file is already a URL, keep it as is
+            return Promise.resolve(file);
+          }
+          return uploadFile(file);
+        });
+        const imageUrls = await Promise.all(uploadPromises);
         payload.photos = imageUrls;
         console.log('All files uploaded successfully');
       } catch (err) {
