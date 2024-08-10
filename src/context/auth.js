@@ -42,24 +42,48 @@ const AuthReducer = (state, action) => {
 export const AuthContextProvider = ({ children }) => {
   const [state, dispatch] = useReducer(AuthReducer, INITIAL_STATE);
 
+  const logout = useCallback(() => {
+    dispatch({ type: "LOGOUT" });
+    localStorage.removeItem("user");
+    localStorage.removeItem("loginTimestamp");
+  }, []);
+
+  const checkLoginStatus = useCallback(() => {
+    const loginTimestamp = localStorage.getItem("loginTimestamp");
+    if (loginTimestamp) {
+      const currentTime = Date.now();
+      const loginTime = parseInt(loginTimestamp, 10);
+      const timeDifference = currentTime - loginTime;
+      const hoursPassed = timeDifference / (1000 * 60 * 60);
+
+      if (hoursPassed >= 24) {
+        logout();
+      }
+    }
+  }, [logout]);
+
   useEffect(() => {
-    localStorage.setItem("user", JSON.stringify(state.user));
+    if (state.user) {
+      localStorage.setItem("user", JSON.stringify(state.user));
+      localStorage.setItem("loginTimestamp", Date.now().toString());
+    }
   }, [state.user]);
 
   useEffect(() => {
-    let logoutTimer;
-    if (state.user) {
-      logoutTimer = setTimeout(() => {
-        dispatch({ type: "LOGOUT" });
-      }, 3600000); // 1 hour in milliseconds
-    }
+    // Check login status immediately when component mounts
+    checkLoginStatus();
+
+    // Set up interval to check every minute
+    const intervalId = setInterval(checkLoginStatus, 60000);
+
+    // Check login status on window focus
+    window.addEventListener('focus', checkLoginStatus);
 
     return () => {
-      if (logoutTimer) {
-        clearTimeout(logoutTimer);
-      }
+      clearInterval(intervalId);
+      window.removeEventListener('focus', checkLoginStatus);
     };
-  }, [state.user, dispatch]);
+  }, [checkLoginStatus]);
 
   return (
     <AuthContext.Provider

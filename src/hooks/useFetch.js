@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 
+// Create an axios instance with default configurations
+const axiosInstance = axios.create({
+  withCredentials: true, // This ensures all requests include credentials
+});
+
 const useFetch = (url) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -10,7 +15,7 @@ const useFetch = (url) => {
         setLoading(true);
         setError(null); // Reset error state before making a new request
         try {
-            const res = await axios.get(url);
+            const res = await axiosInstance.get(url);
             setData(res.data);
         } catch (err) {
             setError(err);

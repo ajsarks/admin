@@ -312,16 +312,25 @@ const Datatable = ({ columns }) => {
   const currentDate = new Date();
 
   const pendingBookings = list.filter(booking => {
+    if (!booking.date || !Array.isArray(booking.date) || booking.date.length === 0) {
+      return false;
+    }
     const lastDate = booking.date[booking.date.length - 1];
     return booking.status === 'pending' && new Date(lastDate) >= currentDate;
   });
 
   const confirmedBookings = list.filter(booking => {
+    if (!booking.date || !Array.isArray(booking.date) || booking.date.length === 0) {
+      return false;
+    }
     const lastDate = booking.date[booking.date.length - 1];
     return booking.status === 'confirmed' && new Date(lastDate) >= currentDate;
   });
 
   const pastBookings = list.filter(booking => {
+    if (!booking.date || !Array.isArray(booking.date) || booking.date.length === 0) {
+      return false;
+    }
     const lastDate = booking.date[booking.date.length - 1];
     return new Date(lastDate) < currentDate;
   });
